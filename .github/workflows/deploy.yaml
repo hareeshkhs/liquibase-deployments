@@ -17,15 +17,20 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Install Ansible
-        run: sudo apt-get update && sudo apt-get install -y ansible
+      - name: Install Ansible and dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ansible sshpass
 
       - name: Configure SSH
         run: |
           mkdir -p ~/.ssh/
-          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/ssh_key.pem
-          chmod 600 ~/.ssh/ssh_key.pem
-          ssh-keyscan ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
+          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/deploy_key.pem
+          chmod 600 ~/.ssh/deploy_key.pem
+          ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
+
+          # Verify SSH connection
+          ssh -i ~/.ssh/deploy_key.pem -o StrictHostKeyChecking=no ubuntu@${{ secrets.EC2_HOST }} "echo 'SSH connection successful'"
 
       - name: Run Ansible Playbook
         env:
@@ -39,4 +44,6 @@ jobs:
             -e "image_tag=${{ github.event.inputs.image_tag }}" \
             -e "db_name=${{ github.event.inputs.db_name }}" \
             -e "github_username=${{ github.actor }}" \
-            -e "github_token=${{ secrets.GITHUB_TOKEN }}"
+            -e "github_token=${{ secrets.GITHUB_TOKEN }}" \
+            --private-key ~/.ssh/deploy_key.pem \
+            -vvv  # Verbose logging for debugging
