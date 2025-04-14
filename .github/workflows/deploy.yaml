@@ -38,6 +38,11 @@ jobs:
           DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
         run: |
           cd ansible
+          # Verify inventory file content
+          cat inventory.ini
+          # Test SSH connection first
+          ssh -i ~/.ssh/deploy_key.pem -o StrictHostKeyChecking=no ubuntu@$(grep -Eo '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' inventory.ini) "echo Connected!"
+
           ansible-playbook playbook.yml \
             -i inventory.ini \
             -e "github_repo=${{ github.repository }}" \
@@ -45,5 +50,5 @@ jobs:
             -e "db_name=${{ github.event.inputs.db_name }}" \
             -e "github_username=${{ github.actor }}" \
             -e "github_token=${{ secrets.GITHUB_TOKEN }}" \
-            --private-key ~/.ssh/deploy_key.pem \
+            -e "ansible_ssh_private_key_file=~/.ssh/deploy_key.pem" \
             -vvv  # Verbose logging for debugging
