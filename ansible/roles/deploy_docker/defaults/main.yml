@@ -1,0 +1,22 @@
+---
+# Default variables for Docker deployment
+github_repo: "hareeshkhs/liquibase-schema-manager" # e.g., "hareeshkhs/liquibase-schema-manager"
+image_tag: "v1.0.0" # Overridden by GitHub Actions input
+container_name: "schema-manager"
+
+# PostgreSQL Connection Defaults (override in GitHub Secrets)
+db_host: "localhost" # Since DB is on same EC2
+db_port: "5432"
+db_user: "postgres" # Default user, override in prod
+db_name: "app_db" # Overridden by GitHub input
+db_password: "changeme" # Override via secrets!
+
+# Docker Configuration
+docker_registry: "ghcr.io"
+restart_policy: "unless-stopped"
+volumes:
+  - "/var/log/schema-manager:/app/logs"
+
+# Timeouts
+docker_pull_timeout: 600 # 10 minutes
+container_start_timeout: 120 # 2 minutes

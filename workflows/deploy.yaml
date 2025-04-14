@@ -1,0 +1,42 @@
+name: Deploy with Ansible
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: "Docker image tag (e.g., v1.0.0)"
+        required: true
+      db_name:
+        description: "PostgreSQL database name"
+        required: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Ansible
+        run: sudo apt-get update && sudo apt-get install -y ansible
+
+      - name: Configure SSH
+        run: |
+          mkdir -p ~/.ssh/
+          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/ssh_key.pem
+          chmod 600 ~/.ssh/ssh_key.pem
+          ssh-keyscan ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Run Ansible Playbook
+        env:
+          DB_USER: ${{ secrets.DB_USER }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+        run: |
+          cd ansible
+          ansible-playbook playbook.yml \
+            -i inventory.ini \
+            -e "github_repo=${{ github.repository }}" \
+            -e "image_tag=${{ github.event.inputs.image_tag }}" \
+            -e "db_name=${{ github.event.inputs.db_name }}" \
+            -e "github_username=${{ github.actor }}" \
+            -e "github_token=${{ secrets.GITHUB_TOKEN }}"
