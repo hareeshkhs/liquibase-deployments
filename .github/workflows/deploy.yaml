@@ -55,6 +55,7 @@ jobs:
 
       - name: Add EC2 host to known_hosts
         run: |
+          mkdir -p ~/.ssh
           ssh-keyscan -H ${{ secrets.POSTGRES_HOST }} >> ~/.ssh/known_hosts
 
       - name: Run Ansible Playbook
