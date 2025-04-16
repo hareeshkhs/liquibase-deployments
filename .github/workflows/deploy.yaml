@@ -1,54 +1,58 @@
-name: Deploy with Ansible
+name: Deploy via Ansible
 
 on:
   workflow_dispatch:
     inputs:
       image_tag:
-        description: "Docker image tag (e.g., v1.0.0)"
+        description: "Docker image tag"
         required: true
       db_name:
-        description: "PostgreSQL database name"
+        description: "Postgres DB name"
         required: true
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v3
 
-      - name: Install Ansible and dependencies
+      - name: Set up Python and Ansible
         run: |
-          sudo apt-get update
-          sudo apt-get install -y ansible sshpass
+          sudo apt update
+          sudo apt install -y python3-pip
+          pip3 install ansible
 
-      - name: Configure SSH
+      - name: Create Ansible vars
         run: |
-          mkdir -p ~/.ssh/
-          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/deploy_key.pem
-          chmod 600 ~/.ssh/deploy_key.pem
-          ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
+          mkdir -p ansible/group_vars
+          cat > ansible/group_vars/all.yml <<EOF
+          dockerhub_username: hareeshkumarkhs
+          dockerhub_pat: "${{ secrets.DOCKER_PAT }}"
+          docker_image: hareeshkumarkhs/liquibase-schema-manager
+          image_tag: "${{ github.event.inputs.image_tag }}"
+          container_name: schema-manager
+          postgres_host: "${{ secrets.POSTGRES_HOST }}"
+          postgres_db: "${{ github.event.inputs.db_name }}"
+          postgres_user: "${{ secrets.POSTGRES_USER }}"
+          postgres_password: "${{ secrets.POSTGRES_PASSWORD }}"
+          email_app_passcode: "${{ secrets.EMAIL_APP_PASSCODE }}"
+          EOF
 
-          # Verify SSH connection
-          ssh -i ~/.ssh/deploy_key.pem -o StrictHostKeyChecking=no ubuntu@${{ secrets.EC2_HOST }} "echo 'SSH connection successful'"
+      - name: Add EC2 host to inventory
+        run: |
+          echo "[ec2]" > ansible/inventory.ini
+          echo "${{ secrets.POSTGRES_HOST }}" >> ansible/inventory.ini
+          echo "[ec2:vars]" >> ansible/inventory.ini
+          echo "ansible_user=ubuntu" >> ansible/inventory.ini
+          echo "ansible_ssh_private_key_file=ansible_key.pem" >> ansible/inventory.ini
+
+      - name: Add SSH Key
+        run: |
+          echo "${{ secrets.EC2_SSH_KEY }}" > ansible_key.pem
+          chmod 600 ansible_key.pem
 
       - name: Run Ansible Playbook
-        env:
-          DB_USER: ${{ secrets.DB_USER }}
-          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
         run: |
-          cd ansible
-          # Verify inventory file content
-          cat inventory.ini
-          # Test SSH connection first
-          ssh -i ~/.ssh/deploy_key.pem -o StrictHostKeyChecking=no ubuntu@$(grep -Eo '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' inventory.ini) "echo Connected!"
-
-          ansible-playbook playbook.yml \
-            -i inventory.ini \
-            -e "github_repo=${{ github.repository }}" \
-            -e "image_tag=${{ github.event.inputs.image_tag }}" \
-            -e "db_name=${{ github.event.inputs.db_name }}" \
-            -e "github_username=${{ github.actor }}" \
-            -e "github_token=${{ secrets.GITHUB_TOKEN }}" \
-            -e "ansible_ssh_private_key_file=~/.ssh/deploy_key.pem" \
-            -vvv  # Verbose logging for debugging
+          ansible-playbook -i ansible/inventory.ini ansible/playbook.yml
