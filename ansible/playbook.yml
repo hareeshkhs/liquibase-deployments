@@ -1,7 +1,46 @@
----
-- hosts: postgres_host
-  become: yes
-  vars_files:
-    - ./roles/deploy_docker/defaults/main.yml
-  roles:
-    - deploy_docker
+- name: Deploy Docker container on EC2
+  hosts: ec2
+  become: true
+
+  tasks:
+    - name: Install Docker
+      apt:
+        name: docker.io
+        state: present
+        update_cache: true
+
+    - name: Ensure Docker service is running
+      service:
+        name: docker
+        state: started
+        enabled: true
+
+    - name: Login to Docker Hub
+      docker_login:
+        username: "{{ dockerhub_username }}"
+        password: "{{ dockerhub_pat }}"
+
+    - name: Pull Docker image
+      docker_image:
+        name: "{{ docker_image }}"
+        tag: "{{ image_tag }}"
+        source: pull
+
+    - name: Remove existing container if any
+      docker_container:
+        name: "{{ container_name }}"
+        state: absent
+        force_kill: true
+
+    - name: Run container
+      docker_container:
+        name: "{{ container_name }}"
+        image: "{{ docker_image }}:{{ image_tag }}"
+        state: started
+        restart_policy: always
+        env:
+          POSTGRES_HOST: "{{ postgres_host }}"
+          POSTGRES_DB: "{{ postgres_db }}"
+          POSTGRES_USER: "{{ postgres_user }}"
+          POSTGRES_PASSWORD: "{{ postgres_password }}"
+          EMAIL_APP_PASSCODE: "{{ email_app_passcode }}"

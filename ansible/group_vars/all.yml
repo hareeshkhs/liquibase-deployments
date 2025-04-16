@@ -1,0 +1,12 @@
+dockerhub_username: hareeshkumarkhs
+dockerhub_pat: YOUR_DOCKER_PAT
+
+docker_image: hareeshkumarkhs/liquibase-schema-manager
+image_tag: v1.0.0
+container_name: schema-manager
+
+postgres_host: YOUR_POSTGRES_HOST
+postgres_db: merchant_db
+postgres_user: YOUR_POSTGRES_USER
+postgres_password: YOUR_POSTGRES_PASSWORD
+email_app_passcode: YOUR_APP_PASSCODE
